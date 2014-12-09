@@ -1,0 +1,14 @@
+package proj.snowflake.src;
+
+public class Ticker implements Runnable {
+	
+	Main main;
+	
+	public Ticker(Main m) {
+		main = m;
+	}
+	
+	public void run() {
+		
+	}
+}

@@ -1,0 +1,7 @@
+package proj.snowflake.src.guimanagers;
+
+public abstract class GUIComponent {
+	public void draw(Graphics g, int width, int height) {
+		
+	}
+}

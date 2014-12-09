@@ -1,0 +1,5 @@
+package proj.snowflake.src.guimanagers;
+
+public class GUIManagerThread {
+	ArrayList<GUIComponent> guiComponents = new ArrayList<GUIComponent>();
+}

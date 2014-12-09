@@ -1,0 +1,19 @@
+package proj.snowflake.src;
+
+public class AquiferStartingPoint {
+	public int topRad;
+	public int bottomRad;
+	
+	public int x;
+	public int y;
+	
+	public Chunk homeChunk;
+	
+	public AquiferStartingPoint(Chunk chunk, int x, int y, int tr, int br) {
+		this.topRad = tr;
+		this.bottomRad = br;
+		this.x = x;
+		this.y = y;
+		this.homeChunk = chunk;
+	}
+}

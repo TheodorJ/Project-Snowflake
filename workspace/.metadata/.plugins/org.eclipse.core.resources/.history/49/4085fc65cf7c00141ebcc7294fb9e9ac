@@ -1,0 +1,57 @@
+package proj.snowflake.src;
+
+public class Ticker implements Runnable {
+	
+	Main main;
+	
+	public long LastTick;
+	
+	public Ticker(Main m) {
+		main = m;
+	}
+	
+	public void tick() {
+        if(main.rightHeld) {
+        	for(int i = 0; i < main.chunks.size(); i++) {
+        		main.chunks.get(i).x -= main.movementSpeed;
+        		main.chunks2.get(i).x -= main.movementSpeed;
+        	}
+        }
+        if(main.leftHeld) {
+        	for(int i = 0; i < main.chunks.size(); i++) {
+        		main.chunks.get(i).x += main.movementSpeed;
+        		main.chunks2.get(i).x += main.movementSpeed;
+        	}
+        }
+        if(main.upHeld) {
+        	for(int i = 0; i < main.chunks.size(); i++) {
+        		main.chunks.get(i).y += main.movementSpeed;
+        		main.chunks2.get(i).y += main.movementSpeed;
+        	}
+        }
+        if(main.downHeld) {
+        	for(int i = 0; i < main.chunks.size(); i++) {
+        		main.chunks.get(i).y -= main.movementSpeed;
+        		main.chunks2.get(i).y -= main.movementSpeed;
+        	}
+        }
+        if(main.zoomingIn) {
+        	if(main.HEIGHTSCALE < main.MAXZOOM)
+        		main.HEIGHTSCALE += 0.02;
+        }
+        if(main.zoomingOut) {
+        	if(main.HEIGHTSCALE > main.MINZOOM)
+        		main.HEIGHTSCALE -= 0.02;
+        }
+    }
+	
+	public void run() {
+		while(true) {
+			tick();
+			try {
+				Thread.sleep(0);
+        	} catch (Exception e) {
+        	}
+		}
+	}
+}

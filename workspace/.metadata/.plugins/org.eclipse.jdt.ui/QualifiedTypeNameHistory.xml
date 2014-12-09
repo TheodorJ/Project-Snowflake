@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<qualifiedTypeNameHistroy>
+<fullyQualifiedTypeName name="java.awt.Toolkit"/>
+<fullyQualifiedTypeName name="java.util.ArrayList"/>
+<fullyQualifiedTypeName name="proj.snowflake.src.guimanagers.GUIComponent"/>
+<fullyQualifiedTypeName name="proj.snowflake.src.guimanagers.BuildingMenu"/>
+<fullyQualifiedTypeName name="java.awt.Graphics"/>
+<fullyQualifiedTypeName name="java.awt.Color"/>
+<fullyQualifiedTypeName name="proj.snowflake.src.guimanagers.BuildingUpgradeMenu"/>
+<fullyQualifiedTypeName name="proj.snowflake.src.buildings.Building"/>
+</qualifiedTypeNameHistroy>

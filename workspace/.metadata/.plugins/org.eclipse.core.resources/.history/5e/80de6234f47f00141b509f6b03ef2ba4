@@ -5,6 +5,7 @@ import javax.swing.*;
 
 import proj.snowflake.src.buildings.*;
 import proj.snowflake.src.guimanagers.BuildingMenu;
+import proj.snowflake.src.guimanagers.BuildingUpgradeMenu;
 import proj.snowflake.src.guimanagers.GUIComponent;
 
 import java.awt.Color;
@@ -37,6 +38,8 @@ public class Main extends Canvas implements Runnable, KeyListener, ActionListene
     public static final String NAME = "Game";
     DecimalFormat df = new DecimalFormat("#.##");
     ArrayList<Chunk> chunks = new ArrayList<Chunk>();
+    
+    ArrayList<Building> buildings = new ArrayList<Building>();
     
     boolean drawBuildingGUI = false;
     
@@ -104,6 +107,14 @@ public class Main extends Canvas implements Runnable, KeyListener, ActionListene
         (new Thread(ticker)).start();
     }
 
+    public int getRealX(int coordX) {
+    	return (int) ((coordX + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2;
+    }
+    
+    public int getRealY(int coordY) {
+    	return (int) ((coordY + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2;
+    }
+    
     public synchronized void start() {
         isRunning = true;
         new Thread(this).start();
@@ -205,6 +216,11 @@ public class Main extends Canvas implements Runnable, KeyListener, ActionListene
         		}
         	}
         }
+        
+        for(int i = 0; i < buildings.size(); i++) {
+        	g.fillRect((int) ((buildings.get(i).x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((buildings.get(i).y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2, (int) (5 * 16 * HEIGHTSCALE), (int) (5 * 16 * HEIGHTSCALE));
+        }
+        
         //Post-chunk-drawing-loop
         
         if(guiCompo != null) {
@@ -291,9 +307,33 @@ public class Main extends Canvas implements Runnable, KeyListener, ActionListene
         System.out.println("Mouse Clicked");
     }
     public void mousePressed(MouseEvent e) {
-        
+    	mouseX = e.getX();
+		mouseY = e.getY();
+		
+		for(int i = 0; i < buildings.size(); i++) {
+			if(mouseX >= getRealX(buildings.get(i).x) && mouseX <= getRealX(buildings.get(i).x) + ((int) (5 * 16 * HEIGHTSCALE))) {
+				if(mouseY >= getRealY(buildings.get(i).y) && mouseY <= getRealY(buildings.get(i).y) + ((int) (5 * 16 * HEIGHTSCALE))) {
+					guiCompo = new BuildingUpgradeMenu(buildings.get(i));
+					return;
+				}
+			}
+		}
+		if(guiCompo instanceof BuildingUpgradeMenu) {
+			if(mouseX <= WIDTH - guiCompo.y) {
+				guiCompo = null;
+			}
+		}
     }
     public void mouseReleased(MouseEvent e) {
+    	if(mousedBuilding != null) {
+    		if(mousedBuilding instanceof Mine) {
+    			((Mine) mousedBuilding).lastMine = System.currentTimeMillis();
+    			
+    		}
+        	buildings.add(mousedBuilding);
+        	mousedBuilding = null;
+        	return;
+        }
         if(guiCompo == null && e.getX() >= WIDTH - 100) {
         	guiCompo = new BuildingMenu();
         }
@@ -305,13 +345,27 @@ public class Main extends Canvas implements Runnable, KeyListener, ActionListene
         		}
         		
         	}
+        	if(e.getX() <= 190 && e.getX() >= 110) {
+        		if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+        			guiCompo = null;
+        			mousedBuilding = new Mine();
+        		}
+        		
+        	}
+        	if(e.getX() <= 290 && e.getX() >= 210) {
+        		if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+        			guiCompo = null;
+        			mousedBuilding = new PowerPlant();
+        		}
+        		
+        	}
         	else if(e.getY() < HEIGHT - 100){
         		guiCompo = null;
         	}
         }
     }
     public void mouseClicked(MouseEvent e) {
-        System.out.println("Mouse Clicked");
+        
     }
     public void mouseEntered(MouseEvent e) {
         
@@ -338,8 +392,8 @@ public class Main extends Canvas implements Runnable, KeyListener, ActionListene
 		if(mousedBuilding != null) {
 			mousedBuilding.x = mouseX;
 			mousedBuilding.y = mouseY;
-			mousedBuilding.x = (int) ((mouseX / (16 * HEIGHTSCALE)) - chunks.get(0).x - WIDTH/2);
-			mousedBuilding.y = (int) ((mouseY / (16 * HEIGHTSCALE)) - chunks.get(0).y - HEIGHT/2);
+			mousedBuilding.x = (int) (((mouseX - WIDTH/2) / (16 * HEIGHTSCALE)) - (chunks.get(0).x));
+			mousedBuilding.y = (int) (((mouseY - HEIGHT/2) / (16 * HEIGHTSCALE)) - (chunks.get(0).y));
 		}
 	}
 }

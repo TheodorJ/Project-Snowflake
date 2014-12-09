@@ -216,7 +216,11 @@ public class Main extends Canvas implements Runnable, KeyListener, ActionListene
         		}
         	}
         }
+        //
         
+        //
+        
+        //
         for(int i = 0; i < buildings.size(); i++) {
         	g.fillRect((int) ((buildings.get(i).x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((buildings.get(i).y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2, (int) (5 * 16 * HEIGHTSCALE), (int) (5 * 16 * HEIGHTSCALE));
         }

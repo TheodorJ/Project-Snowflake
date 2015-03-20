@@ -1,9 +1,0 @@
-package proj.snowflake.src.buildings;
-
-public class BuildingMenu {
-	public int y;
-	
-	public BuildingMenu() {
-		y = 100;
-	}
-}

@@ -1,9 +1,0 @@
-package proj.snowflake.src.guimanagers;
-
-public class BuildingMenu {
-	public int y;
-	
-	public BuildingMenu() {
-		y = 100;
-	}
-}

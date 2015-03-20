@@ -1,0 +1,1306 @@
+package proj.snowflake.src;
+
+import java.awt.Canvas;
+
+import javax.imageio.ImageIO;
+import javax.swing.*;
+
+import proj.snowflake.src.buildings.*;
+import proj.snowflake.src.guimanagers.BuildingMenu;
+import proj.snowflake.src.guimanagers.BuildingUpgradeMenu;
+import proj.snowflake.src.guimanagers.GUIComponent;
+import proj.snowflake.src.guimanagers.MenuMenu;
+import proj.snowflake.src.guimanagers.StatsMenu;
+
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.BorderLayout;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Image;
+import java.awt.RenderingHints;
+import java.awt.Toolkit;
+import java.awt.event.*;
+import java.util.ArrayList;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.image.BufferStrategy;
+import java.awt.image.BufferedImage;
+import java.text.DecimalFormat;
+
+public class Main extends Canvas implements Runnable, KeyListener, ActionListener, MouseListener, MouseMotionListener {
+
+    public static final long serialVersionUID = 1L;
+    public boolean isRunning = false;
+    Font font = new Font("Comic Sans MS", Font.BOLD, 20);
+    Font font2 = new Font("Comic Sans MS", Font.BOLD, 15);
+    Font font3 = new Font("Comic Sans MS", Font.BOLD, 10);
+    Toolkit tk = Toolkit.getDefaultToolkit();
+    public int WIDTH = ((int) tk.getScreenSize().getWidth());
+    public int HEIGHT = ((int) tk.getScreenSize().getHeight());
+    //public static final int WIDTH = 800;
+    //public static final int HEIGHT = 600;
+    public double HEIGHTSCALE = HEIGHT/768;
+    public int VIRTUALHEIGHT;
+    public int VIRTUALWIDTH;
+    public double MAXZOOM = 2;
+    public double MINZOOM = 0.5;
+    public static final String NAME = "Game";
+    DecimalFormat df = new DecimalFormat("#.##");
+    ArrayList<Chunk> chunks = new ArrayList<Chunk>();
+    
+    public int powerPlantCount;
+    
+    public int statPanelx = 0;
+    public int statPanely = 0;
+    
+    long lastClean = System.currentTimeMillis();
+    
+    public double airCleanFactor = 0.0;
+    
+    //In-game variables
+    public int happiness = 0;
+    public int fossilFyools = 0;
+    public int waters = 0;
+    public int science = 0;
+    public int population = 2;
+    public double munnies = 75;
+    public double energies = 0;
+    public double pollution = 0;
+    public int foodings = 0;
+    
+    public String statPanelTag = "";
+    
+    public int houseNumber = 0;
+    
+    public double foodPerCapita = 0;
+    public double energyPerCapita = 0;
+    
+    public double popDeriv = 0;
+    
+    public int MAXHOUSECAPACITY = 100;
+    
+    public int popCap = 0;
+    
+    public int ffreq = 0;
+    
+    public long lastConsumptionUpdate = System.currentTimeMillis();
+    
+    public double round(double x) {
+    	if(x > 1) {
+    		x = 1;
+    	}
+    	if(x < 0) {
+    		x = 0;
+    	}
+    	return x;
+    }
+    
+    public double roundTo25(double x) {
+    	if(x > 25) {
+    		x = 25;
+    	}
+    	if(x < 0) {
+    		x = 0;
+    	}
+    	return x;
+    }
+    
+    public void calcHappiness() {
+    	int intermediate1 = (int) roundTo25((100 - (taxes)/2)/2);
+    	int intermediate2 = (int) (round(foodPerCapita)*25);
+    	int intermediate3 = (int) (round(energyPerCapita)*25);
+    	int intermediate4 = (int) (((100 - pollution))/4);
+    	
+    	double i1 = intermediate1/25;
+    	double i2 = intermediate2/25;
+    	double i3 = intermediate3/25;
+    	double i4 = intermediate4/25;
+    	
+    	intermediate2 *= i4;
+    	intermediate3 *= i3;
+    	intermediate4 *= i1;
+    	intermediate1 *= i2;
+    	
+    	happiness = intermediate1 + intermediate2 + intermediate3 + intermediate4;
+    	
+    	happiness += popDeriv*4;
+    	
+    	if(population > popCap) {
+    		
+    	}
+    	
+    	if(happiness > 100) {
+    		happiness = 100;
+    	}
+    	if(happiness < 0) {
+    		happiness = 0;
+    	}
+    }
+    
+    public void calculatePerCapitas() {
+    	popCap = houseNumber * MAXHOUSECAPACITY + 5;
+    	foodPerCapita = ((double) (foodings))/population;
+    	energyPerCapita = energies/population;
+    	popDeriv = (foodPerCapita * energyPerCapita);
+    	if(foodPerCapita <= 0 && energyPerCapita <= 0) {
+    		popDeriv = 0.5;
+    	}
+    	if(population > popCap) {
+    		popDeriv /= 2;
+    	}
+    	if(popDeriv > 5) {
+    		popDeriv = 5;
+    	}
+    	if(population > Math.abs(popDeriv-2)+1)
+    		population += popDeriv - 2;
+    	if(popDeriv >= 2.0 && population <= 5) {
+    		population += popDeriv;
+    	}
+    }
+    
+    public void calcNewFoodings() {
+    	if(foodings > population)
+    		foodings -= population;
+    }
+    
+    public void calcNewEnergies() {
+    	if(energies > population)
+    		energies -= population;
+    }
+    
+    Image house;
+    Image barn;
+    Image factory;
+    Image lab;
+    Image solar;
+    
+    Image dirt;
+    Image coal;
+    Image grass;
+    Image water;
+    Image stone;
+    Image dirtyWater;
+    Image darkStone;
+    Image darkDirt;
+    
+    BufferedImage MenuMenuIMG;
+    BufferedImage BuildingMenuIMG;
+    
+    BufferedImage fullStar;
+    BufferedImage halfStar;
+    
+    BufferedImage playButton;
+    BufferedImage titleDisplay;
+    
+    int scienceLevel = 1;
+    int gradReq = scienceLevel*20;
+    
+    Color backColor = new Color(32, 128, 255);
+    Color pollColor = new Color(88, 60, 41);
+    
+    public GameState state = GameState.MENU;
+    
+    public enum GameState {
+    	MENU, GAME;
+    }
+    
+    public int getColorFraction(int x1, int x2) {
+    	int difference = x2 - x1;
+    	double fraction = pollution/100;
+    	return x1 + (int) (difference*fraction);
+    }
+    
+    public double addInRange(int small, int large, double x1, double y1) {
+    	double yolo = x1 + y1;
+    	if(yolo < small) {
+    		yolo = small;
+    	}
+    	if(yolo > large) {
+    		yolo = large;
+    	}
+    	return yolo;
+    }
+    
+    ArrayList<Building> buildings = new ArrayList<Building>();
+    ArrayList<MiningTurtle> turtles = new ArrayList<MiningTurtle>();
+    ArrayList<WaterDirtyTurtle> watTurt = new ArrayList<WaterDirtyTurtle>();
+    ArrayList<WaterTurtle> drinkingTurtles = new ArrayList<WaterTurtle>();
+    
+    boolean drawBuildingGUI = false;
+    
+    GUIComponent guiCompo;
+    
+    Building mousedBuilding;
+    
+    double pricePerKWH = 0;
+    
+    Ticker ticker = new Ticker(this);
+    
+    ArrayList<ArrayList<Chunk>> chunkRow = new ArrayList<ArrayList<Chunk>>();
+    
+    AquiferStartingPoint test001;
+    
+    boolean rightHeld = false;
+    boolean leftHeld = false;
+    boolean upHeld = false;
+    boolean downHeld = false;
+    
+    boolean zoomingIn = false;
+    boolean zoomingOut = false;
+    
+    public double taxes = 50;
+    
+    int mouseX = 0;
+    int mouseY = 0;
+
+    int movementSpeed = 2;
+    
+    private JFrame jFrame;
+
+    public Main() {
+        setMinimumSize(new Dimension(WIDTH, HEIGHT));
+        setPreferredSize(new Dimension(WIDTH, HEIGHT));
+        setMaximumSize(new Dimension(WIDTH, HEIGHT));
+
+        jFrame = new JFrame(NAME);
+        jFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        jFrame.setLayout(new BorderLayout());
+        jFrame.add(this, BorderLayout.CENTER);
+        jFrame.setResizable(true);
+        jFrame.setLocation(1366/2 - WIDTH/2,768/2 - HEIGHT/2);
+        jFrame.setUndecorated(true);
+        jFrame.setVisible(true);
+        jFrame.addKeyListener(this);
+        addKeyListener(this);
+        jFrame.addMouseListener(this);
+        addMouseListener(this);
+        jFrame.addMouseMotionListener(this);
+        addMouseMotionListener(this);
+        jFrame.pack();
+        
+        try {
+        	house = ImageIO.read(getClass().getResource("/project/snowflake/images/House.png"));
+        	barn = ImageIO.read(getClass().getResource("/project/snowflake/images/Barn.png"));
+        	factory = ImageIO.read(getClass().getResource("/project/snowflake/images/Factory.png"));
+        	lab = ImageIO.read(getClass().getResource("/project/snowflake/images/Lab.png"));
+        	solar = ImageIO.read(getClass().getResource("/project/snowflake/images/SolarPanels.png"));
+        	dirt = ImageIO.read(getClass().getResource("/project/snowflake/images/Dirt.png"));
+        	coal = ImageIO.read(getClass().getResource("/project/snowflake/images/NewCoal.png"));
+        	grass = ImageIO.read(getClass().getResource("/project/snowflake/images/Grass.png"));
+        	water = ImageIO.read(getClass().getResource("/project/snowflake/images/Water.png"));
+        	stone = ImageIO.read(getClass().getResource("/project/snowflake/images/Stone.png"));
+        	dirtyWater = ImageIO.read(getClass().getResource("/project/snowflake/images/DirtyWater.png"));
+        	darkStone = ImageIO.read(getClass().getResource("/project/snowflake/images/DarkStone.png"));
+        	darkDirt = ImageIO.read(getClass().getResource("/project/snowflake/images/DarkDirt.png"));
+        	MenuMenuIMG = ImageIO.read(getClass().getResource("/project/snowflake/images/MenuMenuIMG.png"));
+        	BuildingMenuIMG = ImageIO.read(getClass().getResource("/project/snowflake/images/BuildingMenuIcon.png"));
+        	fullStar = ImageIO.read(getClass().getResource("/project/snowflake/images/FullStar.png"));
+        	halfStar = ImageIO.read(getClass().getResource("/project/snowflake/images/HalfStar.png"));
+        	playButton = ImageIO.read(getClass().getResource("/project/snowflake/menuimages/PLAYButton.png"));
+        	titleDisplay = ImageIO.read(getClass().getResource("/project/snowflake/menuimages/TITLE.png"));
+        	IconHolder.houseIcon = ImageIO.read(getClass().getResource("/project/snowflake/images/HouseIcon.png"));
+        	IconHolder.barnIcon = ImageIO.read(getClass().getResource("/project/snowflake/images/BarnIcon.png"));
+        	IconHolder.factoryIcon = ImageIO.read(getClass().getResource("/project/snowflake/images/FactoryIcon.png"));
+        	IconHolder.labIcon = ImageIO.read(getClass().getResource("/project/snowflake/images/LabIcon.png"));
+        	IconHolder.solarIcon = ImageIO.read(getClass().getResource("/project/snowflake/images/SolarIcon.png"));
+        } catch(Exception e) {
+        	System.out.println("Images not loaded");
+        }
+        
+        //chunks.add(new Chunk(0,0));
+        //Only this chunk because I'm stretching it to 
+        //take up the space of three
+        chunks.add(new Chunk(-100, 0));
+        //chunks.add(new Chunk(100, 0));
+        //chunks.add(new DeepChunk(0, 100));
+        //chunks.add(new DeepChunk(-100, 100));
+        //chunks.add(new DeepChunk(100, 100));
+        
+        //test001 = new AquiferStartingPoint(chunks.get(1));
+        
+        (new Thread(ticker)).start();
+    }
+
+    public int getRealX(int coordX) {
+    	return (int) ((coordX + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2;
+    }
+    
+    public int getRealY(int coordY) {
+    	return (int) ((coordY + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2;
+    }
+    
+    public synchronized void start() {
+        isRunning = true;
+        new Thread(this).start();
+    }
+
+    public synchronized void stop() {
+        isRunning = false;
+    }
+
+    public void run() {
+        while (isRunning) {
+            //System.out.println("Hej");
+        	if(state == GameState.GAME) {
+        		tick();
+            	render();
+        	}
+        	else if(state == GameState.MENU) {
+        		tickMain();
+        		renderMain();
+        	}
+            /*try {
+                Thread.sleep(0);
+            } catch (Exception e) {
+            }*/
+        }
+    }
+    
+    public void tickMain() {
+    	
+    }
+    
+    public void renderMain() {
+    	BufferStrategy bs = getBufferStrategy();
+        if(bs == null) {
+            createBufferStrategy(3);
+            return;
+        }
+        Graphics2D g = (Graphics2D) bs.getDrawGraphics();
+        
+        g.drawImage(playButton, WIDTH/2 - 100, HEIGHT/2, null);
+        g.drawImage(titleDisplay, WIDTH/2 - 500, 0, null);
+        
+    	g.dispose();
+        bs.show();
+    }
+    
+    public void tick() {
+    	
+    	if(System.currentTimeMillis() - lastConsumptionUpdate >= 1000) {
+    		calculatePerCapitas();
+    		calcNewFoodings();
+    		calcNewEnergies();
+    		calcHappiness();
+    		lastConsumptionUpdate = System.currentTimeMillis();
+    	}
+    	
+    	if(System.currentTimeMillis() - lastClean >= 10 && powerPlantCount == 0) {
+    		if(pollution >= 0.01) {
+            	pollution -= 0.01;
+            }
+    		lastClean = System.currentTimeMillis();
+    	}
+        if(rightHeld) {
+        	for(int i = 0; i < chunks.size(); i++) {
+        		chunks.get(i).x -= movementSpeed;
+        		if(mousedBuilding != null)
+        			mousedBuilding.x += movementSpeed;
+        	}
+        }
+        if(leftHeld) {
+        	for(int i = 0; i < chunks.size(); i++) {
+        		chunks.get(i).x += movementSpeed;
+        		if(mousedBuilding != null)
+        			mousedBuilding.x -= movementSpeed;
+        	}
+        }
+        if(upHeld) {
+        	for(int i = 0; i < chunks.size(); i++) {
+        		chunks.get(i).y += movementSpeed;
+        		if(mousedBuilding != null)
+        			mousedBuilding.y -= movementSpeed;
+        	}
+        }
+        if(downHeld) {
+        	for(int i = 0; i < chunks.size(); i++) {
+        		chunks.get(i).y -= movementSpeed;
+        		if(mousedBuilding != null)
+        			mousedBuilding.y += movementSpeed;
+        	}
+        }
+        if(zoomingIn) {
+        	if(HEIGHTSCALE < MAXZOOM)
+        		HEIGHTSCALE += 0.02;
+        }
+        if(zoomingOut) {
+        	if(HEIGHTSCALE > MINZOOM)
+        		HEIGHTSCALE -= 0.02;
+        }
+        
+        for(int i = 0; i < buildings.size(); i++) {
+        	if(buildings.get(i) instanceof Mine) {
+        		try {
+        			if((System.currentTimeMillis() - ((Mine) buildings.get(i)).lastMine) >= 100) {
+        				if(!((Mine) buildings.get(i)).wat) {
+        					if(chunks.get(0).blocks[buildings.get(i).x][buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex] instanceof AquiferBlock || chunks.get(0).blocks[buildings.get(i).x][buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex] instanceof CoalBlock || chunks.get(0).blocks[buildings.get(i).x][buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex] instanceof LimestoneBlock || chunks.get(0).blocks[buildings.get(i).x][buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex] instanceof DirtBlock) {
+        						Block placeHolder = chunks.get(0).blocks[buildings.get(i).x][buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex];
+        						chunks.get(0).blocks[buildings.get(i).x][buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex] = null;
+        						if(placeHolder instanceof AquiferBlock) {
+        							waters += 1;
+        							drinkingTurtles.add(new WaterTurtle(buildings.get(i).x, buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex));
+        							chunks.get(0).blocks[buildings.get(i).x][buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex] = new AquiferBlock();
+        							((Mine) buildings.get(i)).wat = true;
+        						}
+        						else if(placeHolder instanceof CoalBlock) {
+        							//fossilFyools += 1;
+        							//turtles.add(new MiningTurtle(buildings.get(i).x, buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex));
+        							//chunks.get(0).blocks[buildings.get(i).x][buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex] = new DiscoFFBlock();
+        							chunks.get(0).blocks[buildings.get(i).x][buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex] = new DarkStoneBlock();
+        						}
+        						else if(placeHolder instanceof LimestoneBlock || placeHolder instanceof DirtBlock) {
+        							chunks.get(0).blocks[buildings.get(i).x][buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex] = new DarkDirtBlock();
+        						}
+        					}
+        					else {
+        						chunks.get(0).blocks[buildings.get(i).x][buildings.get(i).y + 5 + ((Mine) buildings.get(i)).mineIndex] = new DarkStoneBlock();
+        					}
+        					
+        					((Mine) buildings.get(i)).lastMine = System.currentTimeMillis();
+        					((Mine) buildings.get(i)).mineIndex += 1;
+        				}
+        			}
+        		} catch(Exception e) {}
+        		if(System.currentTimeMillis() - ((Mine)buildings.get(i)).lastCrop >= 1000) {
+        			foodings += 20;
+        			if(((Mine)buildings.get(i)).wat) {
+        				//waters -= 1;
+        				foodings += 30;
+        			}
+        			((Mine)buildings.get(i)).lastCrop = System.currentTimeMillis();
+        		}
+        	}
+        	else if(buildings.get(i) instanceof SolarPlant) {
+        		pricePerKWH = 1/(energyPerCapita+1);
+        		if(System.currentTimeMillis() - ((SolarPlant)buildings.get(i)).lastTake >= 1000) {
+        			int energyDeriv = 10 + (10*(scienceLevel-1));
+        			energies += energyDeriv;
+        			munnies += energyDeriv * pricePerKWH;
+        			((SolarPlant)buildings.get(i)).lastTake = System.currentTimeMillis();
+        		}
+        	}
+        	else if(buildings.get(i) instanceof RecyclePlant) {
+        		if(System.currentTimeMillis() - ((RecyclePlant)buildings.get(i)).lastTake >= 1000) {
+        			energies -= 3;
+        			double possibleCleanFactor = 0.5 + (0.2*(scienceLevel-1));
+        			if(pollution > possibleCleanFactor) {
+        				pollution -= possibleCleanFactor;
+        			}
+        			((RecyclePlant)buildings.get(i)).lastTake = System.currentTimeMillis();
+        		}
+        	}
+        	else if(buildings.get(i) instanceof PowerPlant) {
+        		if(System.currentTimeMillis() - ((PowerPlant)buildings.get(i)).lastTake >= 1000 && fossilFyools >= 2) {
+        			energies += 30 + (3*(scienceLevel-1));
+        			if(waters >= 1) {
+            			waters -= 1;
+            		}
+        			fossilFyools -= 2;
+        			pollution = addInRange(0, 100, pollution, 1 + airCleanFactor);
+        			((PowerPlant)buildings.get(i)).lastTake = System.currentTimeMillis();
+        		}
+        		try {
+        			if(System.currentTimeMillis() - ((PowerPlant)buildings.get(i)).lastMine >= 100 && fossilFyools < ffreq) {
+        				Block placeHolder = chunks.get(0).blocks[((PowerPlant)buildings.get(i)).x][((PowerPlant)buildings.get(i)).y + 5 + ((PowerPlant)buildings.get(i)).mineIndex];
+        				chunks.get(0).blocks[((PowerPlant)buildings.get(i)).x][((PowerPlant)buildings.get(i)).y + 5 + ((PowerPlant)buildings.get(i)).mineIndex] = new DarkStoneBlock();
+        				if(placeHolder instanceof AquiferBlock) {
+        					watTurt.add(new WaterDirtyTurtle(((PowerPlant)buildings.get(i)).x, ((PowerPlant)buildings.get(i)).y + 5 + ((PowerPlant)buildings.get(i)).mineIndex));
+        					chunks.get(0).blocks[((PowerPlant)buildings.get(i)).x][((PowerPlant)buildings.get(i)).y + 5 + ((PowerPlant)buildings.get(i)).mineIndex] = new DirtyWaterBlock();;
+        				}
+        				else if(placeHolder instanceof CoalBlock) {
+        					turtles.add(new MiningTurtle(((PowerPlant)buildings.get(i)).x, ((PowerPlant)buildings.get(i)).y + 5 + ((PowerPlant)buildings.get(i)).mineIndex));
+        					chunks.get(0).blocks[((PowerPlant)buildings.get(i)).x][((PowerPlant)buildings.get(i)).y + 5 + ((PowerPlant)buildings.get(i)).mineIndex] = new DarkStoneBlock();
+        					fossilFyools += 5;
+        				}
+        				else if(placeHolder instanceof LimestoneBlock || placeHolder instanceof DirtBlock) {
+        					chunks.get(0).blocks[((PowerPlant)buildings.get(i)).x][((PowerPlant)buildings.get(i)).y + 5 + ((PowerPlant)buildings.get(i)).mineIndex] = new DarkDirtBlock();
+        				}
+        				else {
+        					
+        				}
+        				
+        				((PowerPlant)buildings.get(i)).lastMine = System.currentTimeMillis();
+        				((PowerPlant)buildings.get(i)).mineIndex += 1;
+        			}
+        		} catch(Exception e) {}
+        	}
+        	else if(buildings.get(i) instanceof House) {
+        		if(System.currentTimeMillis() - ((House)buildings.get(i)).lastTick >= 1000 && energies >= 1 && (waters >= 1 || ((House)buildings.get(i)).watFound)) {
+        			//energies -= 1;
+        			if(!((House)buildings.get(i)).watFound) {
+        				waters -= 1;
+        			}
+        			if(fossilFyools >= 1) {
+        				fossilFyools -= 1;
+        			}
+        			if(foodings >= 1) {
+        				//foodings -= 1;
+        			}
+        			munnies += taxes/200;
+        			((House)buildings.get(i)).lastTick = System.currentTimeMillis();
+        		}
+        		try {
+        			if(System.currentTimeMillis() - ((House)buildings.get(i)).lastMine >= 100) {
+        				if(chunks.get(0).blocks[((House)buildings.get(i)).x][((House)buildings.get(i)).y + 5 + ((House)buildings.get(i)).mineIndex] instanceof AquiferBlock) {
+        					((House)buildings.get(i)).watFound = true;
+        				}
+        				else {
+        					if(chunks.get(0).blocks[((House)buildings.get(i)).x][((House)buildings.get(i)).y + 5 + ((House)buildings.get(i)).mineIndex] instanceof LimestoneBlock || chunks.get(0).blocks[((House)buildings.get(i)).x][((House)buildings.get(i)).y + 5 + ((House)buildings.get(i)).mineIndex] instanceof DirtBlock) {
+        						chunks.get(0).blocks[((House)buildings.get(i)).x][((House)buildings.get(i)).y + 5 + ((House)buildings.get(i)).mineIndex] = new DarkDirtBlock();
+        					}
+        					else {
+        						chunks.get(0).blocks[((House)buildings.get(i)).x][((House)buildings.get(i)).y + 5 + ((House)buildings.get(i)).mineIndex] = new DarkStoneBlock();
+        					}
+        					((House)buildings.get(i)).mineIndex += 1;
+        				}
+        				((House)buildings.get(i)).lastMine = System.currentTimeMillis();
+        			}
+        		} catch(Exception e) {}
+        	}
+        	else if(buildings.get(i) instanceof ScienceFacility) {
+        		if(System.currentTimeMillis() - ((ScienceFacility)buildings.get(i)).lastScienceUpgrade >= 1000 && munnies >= 3 && energies >= 1) {
+        			energies -= 1;
+        			munnies -= 3;
+        			science += 1;
+        			if(science >= gradReq + (scienceLevel - 1)*20) {
+        				scienceLevel += 1;
+        				gradReq = scienceLevel*20;
+        			}
+        			((ScienceFacility)buildings.get(i)).lastScienceUpgrade = System.currentTimeMillis();
+        		}
+        	}
+        }
+        for(int i = 0; i < turtles.size(); i++) {
+        	if(System.currentTimeMillis() - turtles.get(i).lastMine >= 100) {
+        		try {
+        			if(chunks.get(0).blocks[turtles.get(i).x + turtles.get(i).rightIndex][turtles.get(i).y] instanceof AquiferBlock || chunks.get(0).blocks[turtles.get(i).x + turtles.get(i).rightIndex][turtles.get(i).y] instanceof CoalBlock && fossilFyools < ffreq + turtles.size() - i) {
+        				if(chunks.get(0).blocks[turtles.get(i).x + turtles.get(i).rightIndex][turtles.get(i).y] instanceof AquiferBlock) {
+    						waters += 1;
+    					}
+    					if(chunks.get(0).blocks[turtles.get(i).x + turtles.get(i).rightIndex][turtles.get(i).y] instanceof CoalBlock) {
+    						fossilFyools += 1;
+    						//chunks.get(0).blocks[turtles.get(i).x + turtles.get(i).rightIndex][turtles.get(i).y] = null;
+    						chunks.get(0).blocks[turtles.get(i).x + turtles.get(i).rightIndex][turtles.get(i).y] = new DiscoFFBlock();
+    					}
+    					
+    					turtles.get(i).rightIndex += 1;
+        			}
+        			if(chunks.get(0).blocks[turtles.get(i).x - turtles.get(i).leftIndex][turtles.get(i).y] instanceof AquiferBlock || chunks.get(0).blocks[turtles.get(i).x - turtles.get(i).leftIndex][turtles.get(i).y] instanceof CoalBlock && fossilFyools < ffreq + turtles.size() - i) {
+        				if(chunks.get(0).blocks[turtles.get(i).x - turtles.get(i).leftIndex][turtles.get(i).y] instanceof AquiferBlock) {
+    						waters += 1;
+    					}
+    					if(chunks.get(0).blocks[turtles.get(i).x - turtles.get(i).leftIndex][turtles.get(i).y] instanceof CoalBlock) {
+    						fossilFyools += 1;
+    						//chunks.get(0).blocks[turtles.get(i).x - turtles.get(i).leftIndex][turtles.get(i).y] = null;
+    						chunks.get(0).blocks[turtles.get(i).x - turtles.get(i).leftIndex][turtles.get(i).y] = new DiscoFFBlock();
+    					}
+    					
+    					turtles.get(i).leftIndex += 1;
+        			}
+        			turtles.get(i).lastMine = System.currentTimeMillis();
+        		} catch(Exception e) {}
+        	}
+        }
+        for(int i = 0; i < watTurt.size(); i++) {
+        	if(System.currentTimeMillis() - watTurt.get(i).lastMine >= 100) {
+        		try {
+        			if(chunks.get(0).blocks[watTurt.get(i).x + watTurt.get(i).rightIndex][watTurt.get(i).y] instanceof AquiferBlock) {
+        				chunks.get(0).blocks[watTurt.get(i).x + watTurt.get(i).rightIndex][watTurt.get(i).y] = new DirtyWaterBlock();
+        				watTurt.get(i).rightIndex += 1;
+					}
+        			if(chunks.get(0).blocks[watTurt.get(i).x - watTurt.get(i).leftIndex][watTurt.get(i).y] instanceof AquiferBlock) {
+        				chunks.get(0).blocks[watTurt.get(i).x - watTurt.get(i).leftIndex][watTurt.get(i).y] = new DirtyWaterBlock();
+        				watTurt.get(i).leftIndex += 1;
+					}
+        		} catch(Exception e) {}
+        		watTurt.get(i).lastMine = System.currentTimeMillis();
+        	}
+        }
+        for(int i = 0; i < drinkingTurtles.size(); i++) {
+        	if(System.currentTimeMillis() - drinkingTurtles.get(i).lastMine >= 100) {
+        		try {
+        			if(chunks.get(0).blocks[drinkingTurtles.get(i).x + drinkingTurtles.get(i).rightIndex][drinkingTurtles.get(i).y] instanceof AquiferBlock) {
+        				//chunks.get(0).blocks[drinkingTurtles.get(i).x + drinkingTurtles.get(i).rightIndex][drinkingTurtles.get(i).y] = new DiscoWaBlock();
+        				drinkingTurtles.get(i).rightIndex += 1;
+					}
+        			if(chunks.get(0).blocks[drinkingTurtles.get(i).x - drinkingTurtles.get(i).leftIndex][drinkingTurtles.get(i).y] instanceof AquiferBlock) {
+        				//chunks.get(0).blocks[drinkingTurtles.get(i).x - drinkingTurtles.get(i).leftIndex][drinkingTurtles.get(i).y] = new DiscoWaBlock();
+        				drinkingTurtles.get(i).leftIndex += 1;
+					}
+        		} catch(Exception e) {}
+        		drinkingTurtles.get(i).lastMine = System.currentTimeMillis();
+        	}
+        }
+        
+        
+        
+    }
+    
+    public void render() {
+        BufferStrategy bs = getBufferStrategy();
+        if(bs == null) {
+            createBufferStrategy(3);
+            return;
+        }
+        Graphics2D g = (Graphics2D) bs.getDrawGraphics();
+        g.fillRect(0,0,WIDTH, HEIGHT);
+        g.setFont(font);
+        g.clearRect(0, 0, WIDTH, HEIGHT);
+        Color fractionedColor = new Color(getColorFraction(backColor.getRed(), pollColor.getRed()), getColorFraction(backColor.getGreen(), pollColor.getGreen()), getColorFraction(backColor.getBlue(), pollColor.getBlue()));
+        g.setColor(fractionedColor);
+        g.fillRect(0,0,WIDTH,HEIGHT);
+        
+        for(int i = 0; i < chunks.size(); i++) {
+        	for(int j = 0; j < chunks.get(i).blocks.length; j++) {
+        		for(int k = 0; k < chunks.get(i).blocks[0].length; k++) {
+        			if(chunks.get(i).blocks[j][k] != null){
+        				if(chunks.get(i).blocks[j][k] instanceof LimestoneBlock) {
+        					//g.setColor(new Color(0,255,0));
+        					g.drawImage(grass, (int) ((j + chunks.get(i).x)*16*HEIGHTSCALE)- 1 + WIDTH/2, (int) ((k + chunks.get(i).y)*16*HEIGHTSCALE) - 1 + HEIGHT/2, (int) (16 * HEIGHTSCALE) + 1, (int) (16 * HEIGHTSCALE) + 1, null);
+        				}
+        				else if(chunks.get(i).blocks[j][k] instanceof DirtBlock) {
+        					//g.setColor(new Color(128, 64, 0));
+        					g.drawImage(dirt, (int) ((j + chunks.get(i).x)*16*HEIGHTSCALE)- 1 + WIDTH/2, (int) ((k + chunks.get(i).y)*16*HEIGHTSCALE) - 1 + HEIGHT/2, (int) (16 * HEIGHTSCALE) + 1, (int) (16 * HEIGHTSCALE) + 1, null);
+        				}
+        				else if(chunks.get(i).blocks[j][k] instanceof StoneBlock) {
+        					g.setColor(new Color(128,128,128));
+        					g.drawImage(stone, (int) ((j + chunks.get(i).x)*16*HEIGHTSCALE)- 1 + WIDTH/2, (int) ((k + chunks.get(i).y)*16*HEIGHTSCALE) - 1 + HEIGHT/2, (int) (16 * HEIGHTSCALE) + 1, (int) (16 * HEIGHTSCALE) + 1, null);
+        				}
+        				else if(chunks.get(i).blocks[j][k] instanceof AquiferBlock && !(chunks.get(i).blocks[j][k] instanceof DiscoWaBlock)) {
+        					//g.setColor(new Color(0, 0, 255));
+        					g.drawImage(water, (int) ((j + chunks.get(i).x)*16*HEIGHTSCALE)- 1 + WIDTH/2, (int) ((k + chunks.get(i).y)*16*HEIGHTSCALE) - 1 + HEIGHT/2, (int) (16 * HEIGHTSCALE) + 1, (int) (16 * HEIGHTSCALE) + 1, null);
+        				}
+        				else if(chunks.get(i).blocks[j][k] instanceof DirtyWaterBlock) {
+        					g.drawImage(dirtyWater, (int) ((j + chunks.get(i).x)*16*HEIGHTSCALE)- 1 + WIDTH/2, (int) ((k + chunks.get(i).y)*16*HEIGHTSCALE) - 1 + HEIGHT/2, (int) (16 * HEIGHTSCALE) + 1, (int) (16 * HEIGHTSCALE) + 1, null);
+        				}
+        				else if(chunks.get(i).blocks[j][k] instanceof CoalBlock) {
+        					g.drawImage(coal, (int) ((j + chunks.get(i).x)*16*HEIGHTSCALE)- 1 + WIDTH/2, (int) ((k + chunks.get(i).y)*16*HEIGHTSCALE) - 1 + HEIGHT/2, (int) (16 * HEIGHTSCALE) + 1, (int) (16 * HEIGHTSCALE) + 1, null);
+        				}
+        				else if(chunks.get(i).blocks[j][k] instanceof DiscoFFBlock) {
+        					//g.setColor(new Color(64, 64, 64));
+        					g.drawImage(darkStone, (int) ((j + chunks.get(i).x)*16*HEIGHTSCALE)- 1 + WIDTH/2, (int) ((k + chunks.get(i).y)*16*HEIGHTSCALE) - 1 + HEIGHT/2, (int) (16 * HEIGHTSCALE) + 1, (int) (16 * HEIGHTSCALE) + 1, null);
+        				}
+        				else if(chunks.get(i).blocks[j][k] instanceof DiscoWaBlock) {
+        					g.setColor(new Color(0, 128, 0));
+        				}
+        				else if(chunks.get(i).blocks[j][k] instanceof DarkStoneBlock) {
+        					g.drawImage(darkStone, (int) ((j + chunks.get(i).x)*16*HEIGHTSCALE)- 1 + WIDTH/2, (int) ((k + chunks.get(i).y)*16*HEIGHTSCALE) - 1 + HEIGHT/2, (int) (16 * HEIGHTSCALE) + 1, (int) (16 * HEIGHTSCALE) + 1, null);
+        				}
+        				else if(chunks.get(i).blocks[j][k] instanceof DarkDirtBlock) {
+        					g.drawImage(darkDirt, (int) ((j + chunks.get(i).x)*16*HEIGHTSCALE)- 1 + WIDTH/2, (int) ((k + chunks.get(i).y)*16*HEIGHTSCALE) - 1 + HEIGHT/2, (int) (16 * HEIGHTSCALE) + 1, (int) (16 * HEIGHTSCALE) + 1, null);
+        				}
+        				//g.fillRect((int) ((j + chunks.get(i).x)*16*HEIGHTSCALE) - 1 + WIDTH/2,(int) ((k + chunks.get(i).y)*16*HEIGHTSCALE) - 1 + HEIGHT/2,(int) (16*HEIGHTSCALE) + 2,(int) (16*HEIGHTSCALE) + 2);
+        			}
+        			else {
+        				g.setColor(fractionedColor);
+        				//g.fillRect((int) ((j + chunks.get(i).x)*16*HEIGHTSCALE)- 1 + WIDTH/2,(int) ((k + chunks.get(i).y)*16*HEIGHTSCALE) - 1 + HEIGHT/2,(int) (16*HEIGHTSCALE) + 2,(int) (16*HEIGHTSCALE) + 2);
+        			}
+        			//THIS IS THE SQUARE DRAW METHOD
+        			//g.fillRect((int) ((j + chunks.get(i).x)*16*HEIGHTSCALE)- 1 + WIDTH/2,(int) ((k + chunks.get(i).y)*16*HEIGHTSCALE) - 1 + HEIGHT/2,(int) (16*HEIGHTSCALE) + 2,(int) (16*HEIGHTSCALE) + 2);
+        			//g.fillRect((int) ((j + chunks.get(i).x)*16)- 1 + WIDTH/2,(int) ((k + chunks.get(i).y)*16) - 1 + HEIGHT/2,(int) (16) + 2,(int) (16) + 2);
+        		}
+        	}
+        }
+        //
+        
+        //
+        
+        //
+        //house = resize(house, (int) (80 * HEIGHTSCALE), (int) (80 * HEIGHTSCALE));
+        for(int i = 0; i < buildings.size(); i++) {
+        	if(buildings.get(i) instanceof House) {
+        		g.drawImage(house, (int) ((buildings.get(i).x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((buildings.get(i).y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2, (int) (82 * HEIGHTSCALE), (int) (82 * HEIGHTSCALE), null);
+        	}
+        	else if(buildings.get(i) instanceof Mine) {
+        		g.drawImage(barn, (int) ((buildings.get(i).x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((buildings.get(i).y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2, (int) (162 * HEIGHTSCALE), (int) (82 * HEIGHTSCALE), null);
+        	}
+        	else if(buildings.get(i) instanceof PowerPlant) {
+        		g.drawImage(factory, (int) ((buildings.get(i).x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((buildings.get(i).y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2 - (int) (80*HEIGHTSCALE), (int) (162 * HEIGHTSCALE), (int) (162 * HEIGHTSCALE), null);
+        	}
+        	else if(buildings.get(i) instanceof ScienceFacility) {
+        		g.drawImage(lab, (int) ((buildings.get(i).x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((buildings.get(i).y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2 + (int) (10 * HEIGHTSCALE), (int) (82 * HEIGHTSCALE), (int) (82 * HEIGHTSCALE), null);
+        	}
+        	else if(buildings.get(i) instanceof SolarPlant) {
+        		g.drawImage(solar, (int) ((buildings.get(i).x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((buildings.get(i).y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2 + (int) (10 * HEIGHTSCALE), (int) (82 * HEIGHTSCALE), (int) (82 * HEIGHTSCALE), null);
+        	}
+        	else {
+        		g.fillRect((int) ((buildings.get(i).x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((buildings.get(i).y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2, (int) (5 * 16 * HEIGHTSCALE), (int) (5 * 16 * HEIGHTSCALE));
+        	}
+        }
+        
+        //Post-chunk-drawing-loop
+        
+        if(guiCompo != null) {
+        	if(guiCompo instanceof MenuMenu) {
+        		g.setColor(new Color(1f, 1f, 1f, 0.75f));
+        		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+        		g.fillRoundRect(WIDTH/2 - 210, HEIGHT/2 - 210, 420, 420, 50, 50);
+        		g.setColor(Color.gray);
+        		g.drawLine(WIDTH/2 - 200, HEIGHT/2 - 80, WIDTH/2 + 200, HEIGHT/2 - 80);
+        		g.fillRect((int) (WIDTH/2 - 200 + taxes*4 - 5), HEIGHT/2 - 90, 10, 20);
+        		FontMetrics fm = getFontMetrics(getFont());
+        		int width = fm.stringWidth("Taxes");
+        		g.setColor(Color.black);
+        		g.drawString("Taxes", WIDTH/2 - width, HEIGHT/2 - 150);
+        		g.setFont(font2);
+        		FontMetrics f = getFontMetrics(getFont());
+        		int widt = fm.stringWidth("(more taxes = more munnies, but more unhappy people)");
+        		g.drawString("(more taxes = more munnies, but more unhappy people)", WIDTH/2 - 185, HEIGHT/2 - 130);
+        	}
+        	else if(guiCompo instanceof StatsMenu) {
+        		g.setColor(new Color(1f, 1f, 1f, 0.75f));
+        		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+        		g.fillRoundRect(WIDTH/2 - 210, HEIGHT/2 - 210, 420, 420, 50, 50);
+        		
+        		double popIntermediate = ((double)popCap)/((double)population);
+        		if(popIntermediate > 2) {
+        			popIntermediate = 2;
+        		}
+        		if(popIntermediate >= 1) {
+        			g.setColor(Color.green);
+        		}
+        		if(popIntermediate < 1) {
+        			g.setColor(new Color((int) (255 - (255*popIntermediate)), (int) (255 * popIntermediate), 0));
+        		}
+        		g.fillRect(WIDTH/2 - 185 + 5, (int) (HEIGHT/2 + 185 - (185*popIntermediate)), 86, (int) (185*popIntermediate) + 1);
+        		
+        		double foodIntermediate = foodPerCapita/10;
+        		if(foodIntermediate > 2) {
+        			foodIntermediate = 2;
+        		}
+        		if(foodIntermediate >= 1) {
+        			g.setColor(Color.green);
+        		}
+        		if(foodIntermediate < 1) {
+        			g.setColor(new Color((int) (255 - (255*foodIntermediate)), (int) (255 * foodIntermediate), 0));
+        		}
+        		g.fillRect(WIDTH/2 - 185 + 10 + 86, (int) (HEIGHT/2 + 185 - (185*foodIntermediate)), 86, (int) (185*foodIntermediate) + 1);
+        		
+        		double energyIntermediate = energyPerCapita/10;
+        		if(energyIntermediate > 2) {
+        			energyIntermediate = 2;
+        		}
+        		if(energyIntermediate >= 1) {
+        			g.setColor(Color.green);
+        		}
+        		if(energyIntermediate < 1) {
+        			g.setColor(new Color((int) (255 - (255*energyIntermediate)), (int) (255 * energyIntermediate), 0));
+        		}
+        		g.fillRect(WIDTH/2 - 185 + 15 + 172, (int) (HEIGHT/2 + 185 - (185*energyIntermediate)), 86, (int) (185*energyIntermediate) + 1);
+        		
+        		
+        		g.setColor(Color.black);
+        		g.drawLine(WIDTH/2 - 185, HEIGHT/2 - 185, WIDTH/2 - 185, HEIGHT/2 + 185);
+        		g.drawLine(WIDTH/2 - 185, HEIGHT/2 + 185, WIDTH/2 + 185, HEIGHT/2 + 185);
+        	}
+        	else {
+        		guiCompo.draw(g,  WIDTH, HEIGHT);
+        	}
+        }
+        
+        if(mousedBuilding != null) {
+        	if(mousedBuilding instanceof House) {
+        		g.drawImage(house, (int) ((mousedBuilding.x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((mousedBuilding.y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2, (int) (5 * 16 * HEIGHTSCALE), (int) (5 * 16 * HEIGHTSCALE),  null);
+        	}
+        	else if(mousedBuilding instanceof Mine) {
+        		g.drawImage(barn, (int) ((mousedBuilding.x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((mousedBuilding.y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2, (int) (162 * HEIGHTSCALE), (int) (5 * 16 * HEIGHTSCALE),  null);
+        	}
+        	else if(mousedBuilding instanceof PowerPlant) {
+        		g.drawImage(factory, (int) ((mousedBuilding.x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((mousedBuilding.y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2 - (int) (80*HEIGHTSCALE), (int) (162 * HEIGHTSCALE), (int) (162 * HEIGHTSCALE),  null);
+        	}
+        	else if(mousedBuilding instanceof ScienceFacility) {
+        		g.drawImage(lab, (int) ((mousedBuilding.x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((mousedBuilding.y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2, (int) (5 * 16 * HEIGHTSCALE), (int) (5 * 16 * HEIGHTSCALE),  null);
+        	}
+        	else if(mousedBuilding instanceof SolarPlant) {
+        		g.drawImage(solar, (int) ((mousedBuilding.x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((mousedBuilding.y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2, (int) (5 * 16 * HEIGHTSCALE), (int) (5 * 16 * HEIGHTSCALE),  null);
+        	}
+        	else {
+        		g.setColor(Color.RED);
+        		g.fillRect((int) ((mousedBuilding.x + chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((mousedBuilding.y + chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2, (int) (5 * 16 * HEIGHTSCALE), (int) (5 * 16 * HEIGHTSCALE));
+        		//g.fillRect((int) ((mousedBuilding.x + 2*chunks.get(0).x) * 16 * HEIGHTSCALE) + WIDTH/2, (int) ((mousedBuilding.y + 2*chunks.get(0).y) * 16 * HEIGHTSCALE) + HEIGHT/2, (int) (5 * 16 * HEIGHTSCALE), (int) (5 * 16 * HEIGHTSCALE));
+        		//g.fillRect(mousedBuilding.x, mousedBuilding.y, 100, 100);
+        	}
+        }
+        g.setFont(font);
+        g.setColor(Color.BLACK);
+        g.drawString("Money = " + munnies, 0, 20);
+        g.drawString("Water = " + waters, 0, 40);
+        g.drawString("Fossil Fuels = " + fossilFyools, 0, 60);
+        g.drawString("Science Level: " + scienceLevel, 0, 80);
+        g.drawString("Population: " + population + "&" + popCap, 0, 100);
+        g.drawString("Pop growth: " + popDeriv, 0, 120);
+        g.drawString("Food per Capita: " + foodPerCapita, 0, 140);
+        g.drawString("Energy per Capita: " + energyPerCapita, 0, 160);
+        g.drawString("Foodings: " + foodings, 0, 180);
+        g.drawString("Happiness: " + happiness, 0, 200);
+        
+        //g.setColor(Color.black);
+        //g.fillRect(WIDTH - 150, 0, 200, 75);
+        if(guiCompo == null) {
+        	g.drawImage(MenuMenuIMG, null, WIDTH - 100, 0);
+        	g.drawImage(BuildingMenuIMG, null, WIDTH - 100, 100);
+        }
+        //This is going to be the "pan area"
+        //g.fillRect(0, 0, 20, HEIGHT);
+        g.setColor(new Color(0.75f, 0f, 1f, 1f));
+        g.fillRect(10, 100, (int) (100 * (science / ((gradReq + (scienceLevel - 1)*20)))), 10);
+        //g.fillRect(10, 100, 100, 100);
+        //gradReq + (scienceLevel - 1)*20
+        
+        int starsToDraw = (happiness + 10)/10;
+        
+        boolean drawHalfStar = starsToDraw%2 == 0;
+        int realStars = starsToDraw/2;
+        
+        int pixelSpace = realStars*70;
+        if(drawHalfStar)
+        	pixelSpace += 70;
+        
+        for(int i = 0; i < realStars; i++) {
+        	g.drawImage(fullStar, WIDTH/2 - pixelSpace/2 + 70*i, 0, null);
+        }
+        
+        
+        if(guiCompo instanceof BuildingMenu) {
+        	if(mouseX >= 10 && mouseX <= 90) {
+        		if(mouseY >= HEIGHT - 90 && mouseY <= HEIGHT - 10) {
+        			g.setColor(new Color(1f, 1f, 1f, 0.75f));
+        			g.fillRect(0, HEIGHT - 120, WIDTH, 20);
+        			g.setColor(Color.black);
+        			g.drawString(statPanelTag, 0, HEIGHT - 100);
+        		}
+        	}
+        	if(mouseX >= 110 && mouseX <= 190) {
+        		if(mouseY >= HEIGHT - 90 && mouseY <= HEIGHT - 10) {
+        			g.setColor(new Color(1f, 1f, 1f, 0.75f));
+        			g.fillRect(0, HEIGHT - 120, WIDTH, 20);
+        			g.setColor(Color.black);
+        			g.drawString(statPanelTag, 0, HEIGHT - 100);
+        		}
+        	}
+        	if(mouseX >= 210 && mouseX <= 290) {
+        		if(mouseY >= HEIGHT - 90 && mouseY <= HEIGHT - 10) {
+        			g.setColor(new Color(1f, 1f, 1f, 0.75f));
+        			g.fillRect(0, HEIGHT - 120, WIDTH, 20);
+        			g.setColor(Color.black);
+        			g.drawString(statPanelTag, 0, HEIGHT - 100);
+        		}
+        	}
+        	if(mouseX >= 310 && mouseX <= 390) {
+        		if(mouseY >= HEIGHT - 90 && mouseY <= HEIGHT - 10) {
+        			g.setColor(new Color(1f, 1f, 1f, 0.75f));
+        			g.fillRect(0, HEIGHT - 120, WIDTH, 20);
+        			g.setColor(Color.black);
+        			g.drawString(statPanelTag, 0, HEIGHT - 100);
+        		}
+        	}
+        	if(mouseX >= 410 && mouseX <= 490) {
+        		if(mouseY >= HEIGHT - 90 && mouseY <= HEIGHT - 10) {
+        			g.setColor(new Color(1f, 1f, 1f, 0.75f));
+        			g.fillRect(0, HEIGHT - 120, WIDTH, 20);
+        			g.setColor(Color.black);
+        			g.drawString(statPanelTag, 0, HEIGHT - 100);
+        		}
+        	}
+        	if(mouseX >= 510 && mouseX <= 590) {
+        		if(mouseY >= HEIGHT - 90 && mouseY <= HEIGHT - 10) {
+        			g.setColor(new Color(1f, 1f, 1f, 0.75f));
+        			g.fillRect(0, HEIGHT - 120, WIDTH, 20);
+        			g.setColor(Color.black);
+        			g.drawString(statPanelTag, 0, HEIGHT - 100);
+        		}
+        	}
+        }
+        
+        g.dispose();
+        bs.show();
+    }
+
+    public void keyTyped(KeyEvent e) {
+        
+    }
+
+    public void keyPressed(KeyEvent e) {
+    	if(e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+    		System.exit(0);
+    	}
+    	if(state == GameState.GAME) {
+    		if(e.getKeyChar() == 'd') {
+    			for(int i = 0; i < chunks.size(); i++) {
+    				rightHeld = true;
+    			}
+    		}
+    		if(e.getKeyChar() == 'a') {
+    			for(int i = 0; i < chunks.size(); i++) {
+    				leftHeld = true;
+    			}
+    		}
+    		if(e.getKeyChar() == 'w') {
+    			for(int i = 0; i < chunks.size(); i++) {
+    				upHeld = true;
+    			}
+    		}
+    		if(e.getKeyChar() == 's') {
+    			for(int i = 0; i < chunks.size(); i++) {
+    				downHeld = true;
+    			}
+    		}
+    		if(e.getKeyChar() == 't') {
+    			zoomingIn = true;
+    		}
+    		if(e.getKeyChar() == 'g') {
+    			zoomingOut = true;
+    		}
+    		if(mousedBuilding != null) {
+    			mousedBuilding = null;
+    		}
+    	}
+    }
+
+    public void keyReleased(KeyEvent e) {
+    	if(state == GameState.GAME) {
+    		if(e.getKeyChar() == 'd') {
+    			for(int i = 0; i < chunks.size(); i++) {
+    				rightHeld = false;
+    			}
+    		}
+    		if(e.getKeyChar() == 'a') {
+    			for(int i = 0; i < chunks.size(); i++) {
+    				leftHeld = false;
+    			}
+    		}
+    		if(e.getKeyChar() == 'w') {
+    			for(int i = 0; i < chunks.size(); i++) {
+    				upHeld = false;
+    			}
+    		}
+    		if(e.getKeyChar() == 's') {
+    			for(int i = 0; i < chunks.size(); i++) {
+    				downHeld = false;
+    			}
+    		}
+    		if(e.getKeyChar() == 't') {
+    			zoomingIn = false;
+    		}
+    		if(e.getKeyChar() == 'g') {
+    			zoomingOut = false;
+    		}
+    	}
+    }
+
+    public void actionPerformed(ActionEvent e) {
+        
+    }
+    public void mousePressed(MouseEvent e) {
+    	if(state == GameState.GAME) {
+    		mouseX = e.getX();
+    		mouseY = e.getY();
+    		
+    		for(int i = 0; i < buildings.size(); i++) {
+    			if(mouseX >= getRealX(buildings.get(i).x) && mouseX <= getRealX(buildings.get(i).x) + ((int) (5 * 16 * HEIGHTSCALE))) {
+    				if(mouseY >= getRealY(buildings.get(i).y) && mouseY <= getRealY(buildings.get(i).y) + ((int) (5 * 16 * HEIGHTSCALE))) {
+    					guiCompo = new BuildingUpgradeMenu(i);
+    					return;
+    				}
+    			}
+    		}
+    		if(guiCompo instanceof BuildingUpgradeMenu) {
+    			if(mouseX <= WIDTH - guiCompo.y) {
+    				guiCompo = null;
+    				return;
+    			}
+    			else if(mouseY < 100) {
+    				if(buildings.get(((BuildingUpgradeMenu)guiCompo).reference) instanceof PowerPlant) {
+    					ffreq -= 2;
+    					powerPlantCount -= 1;
+    				}
+    				if(buildings.get(((BuildingUpgradeMenu)guiCompo).reference) instanceof House) {
+    					ffreq -= 1;
+    					houseNumber -= 1;
+    				}
+    				buildings.remove(((BuildingUpgradeMenu)guiCompo).reference);
+    				guiCompo = null;
+    				munnies -= 10;
+    				return;
+    			}
+    		}
+    		if(mousedBuilding != null) {
+    			//int holder = (int) (((mouseX - WIDTH/2) / (16 * HEIGHTSCALE)) - (chunks.get(0).x));
+    			//holder -= holder%5;
+    			//mousedBuilding.x = (int) (((mouseX - WIDTH/2) / (80 * HEIGHTSCALE)) - (chunks.get(0).x));
+    			//mousedBuilding.x = holder;
+    			if(mousedBuilding instanceof Mine) {
+    				((Mine) mousedBuilding).lastMine = System.currentTimeMillis();
+    				
+    			}
+    			if(mousedBuilding instanceof House) {
+    				munnies -= 10;
+    				buildings.add(mousedBuilding);
+    				ffreq += 1;
+    				houseNumber += 1;
+    				population += 2;
+    			}
+    			else if(mousedBuilding instanceof Mine) {
+    				munnies -= 25;
+    				buildings.add(mousedBuilding);
+    			}
+    			else if(mousedBuilding instanceof PowerPlant) {
+    				munnies -= 15;
+    				buildings.add(mousedBuilding);
+    				ffreq += 2;
+    				powerPlantCount += 1;
+    			}
+    			else if(mousedBuilding instanceof ScienceFacility) {
+    				munnies -= 30;
+    				buildings.add(mousedBuilding);
+    			}
+    			else if(mousedBuilding instanceof SolarPlant) {
+    				munnies -= 30;
+    				buildings.add(mousedBuilding);
+    			}
+    			else if(mousedBuilding instanceof RecyclePlant) {
+    				munnies -= 30;
+    				buildings.add(mousedBuilding);
+    			}
+    			mousedBuilding = null;
+    			return;
+    		}
+    		if(guiCompo == null && e.getX() >= WIDTH - 100 && e.getY() >= 100 && e.getY() < 200) {
+    			guiCompo = new BuildingMenu();
+    		}
+    		else if(guiCompo == null && e.getX() >= WIDTH - 100 && e.getY() < 100) {
+    			guiCompo = new MenuMenu();
+    		}
+    		else if(guiCompo == null && e.getX() >= WIDTH - 100 && e.getY() >= 200 && e.getY() < 300) {
+    			guiCompo = new StatsMenu();
+    		}
+    		else if(guiCompo instanceof MenuMenu) {
+    			if(e.getX() < WIDTH/2 - 210 || e.getX() > WIDTH/2 + 210 || e.getY() < HEIGHT/2 - 210 || e.getY() > HEIGHT/2 + 210) {
+    				guiCompo = null;
+    			}
+    		}
+    		else if(guiCompo instanceof StatsMenu) {
+    			if(e.getX() < WIDTH/2 - 210 || e.getX() > WIDTH/2 + 210 || e.getY() < HEIGHT/2 - 210 || e.getY() > HEIGHT/2 + 210) {
+    				guiCompo = null;
+    			}
+    		}
+    		else if(guiCompo instanceof BuildingMenu) {
+    			if(e.getX() <= 90 && e.getX() >= 10) {
+    				if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+    					guiCompo = null;
+    					mousedBuilding = new House();
+    				}
+    				
+    			}
+    			if(e.getX() <= 190 && e.getX() >= 110) {
+    				if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+    					guiCompo = null;
+    					mousedBuilding = new Mine();
+    				}
+    				
+    			}
+    			if(e.getX() <= 290 && e.getX() >= 210) {
+    				if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+    					guiCompo = null;
+    					mousedBuilding = new PowerPlant();
+    				}
+    				
+    			}
+    			if(e.getX() <= 390 && e.getX() >= 310) {
+    				if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+    					guiCompo = null;
+    					mousedBuilding = new ScienceFacility();
+    				}
+    				
+    			}
+    			if(e.getX() <= 490 && e.getX() >= 410) {
+    				if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+    					guiCompo = null;
+    					mousedBuilding = new SolarPlant();
+    				}
+    				
+    			}
+    			if(e.getX() <= 590 && e.getX() >= 510) {
+    				if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+    					guiCompo = null;
+    					mousedBuilding = new RecyclePlant();
+    				}
+    			}
+    			else if(e.getY() < HEIGHT - 100){
+    				guiCompo = null;
+    			}
+    		}
+    	}
+    }
+    public void mouseReleased(MouseEvent e) {
+    	/*if(mousedBuilding != null) {
+    		//int holder = (int) (((mouseX - WIDTH/2) / (16 * HEIGHTSCALE)) - (chunks.get(0).x));
+    		//holder -= holder%5;
+    		//mousedBuilding.x = (int) (((mouseX - WIDTH/2) / (80 * HEIGHTSCALE)) - (chunks.get(0).x));
+    		//mousedBuilding.x = holder;
+    		if(mousedBuilding instanceof Mine) {
+    			((Mine) mousedBuilding).lastMine = System.currentTimeMillis();
+    			
+    		}
+        	if(mousedBuilding instanceof House) {
+        		munnies -= 10;
+        		buildings.add(mousedBuilding);
+        	}
+        	else if(mousedBuilding instanceof Mine) {
+        		munnies -= 25;
+        		buildings.add(mousedBuilding);
+        	}
+        	else if(mousedBuilding instanceof PowerPlant) {
+        		munnies -= 15;
+        		buildings.add(mousedBuilding);
+        	}
+        	else if(mousedBuilding instanceof ScienceFacility) {
+        		munnies -= 30;
+        		buildings.add(mousedBuilding);
+        	}
+        	else if(mousedBuilding instanceof SolarPlant) {
+        		munnies -= 30;
+        		buildings.add(mousedBuilding);
+        	}
+        	mousedBuilding = null;
+        	return;
+        }
+        if(guiCompo == null && e.getX() >= WIDTH - 100 && e.getY() >= 100) {
+        	guiCompo = new BuildingMenu();
+        }
+        else if(guiCompo == null && e.getX() >= WIDTH - 100 && e.getY() < 100) {
+        	guiCompo = new MenuMenu();
+        }
+        else if(guiCompo instanceof MenuMenu) {
+        	if(e.getX() < WIDTH/2 - 210 || e.getX() > WIDTH/2 + 210 || e.getY() < HEIGHT/2 - 210 || e.getY() > HEIGHT/2 + 210) {
+        		guiCompo = null;
+        	}
+        }
+        else if(guiCompo instanceof BuildingMenu) {
+        	if(e.getX() <= 90 && e.getX() >= 10) {
+        		if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+        			guiCompo = null;
+        			mousedBuilding = new House();
+        		}
+        		
+        	}
+        	if(e.getX() <= 190 && e.getX() >= 110) {
+        		if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+        			guiCompo = null;
+        			mousedBuilding = new Mine();
+        		}
+        		
+        	}
+        	if(e.getX() <= 290 && e.getX() >= 210) {
+        		if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+        			guiCompo = null;
+        			mousedBuilding = new PowerPlant();
+        		}
+        		
+        	}
+        	if(e.getX() <= 390 && e.getX() >= 310) {
+        		if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+        			guiCompo = null;
+        			mousedBuilding = new ScienceFacility();
+        		}
+        		
+        	}
+        	if(e.getX() <= 490 && e.getX() >= 410) {
+        		if(e.getY() <= HEIGHT - 10 && e.getY() >= HEIGHT - 90) {
+        			guiCompo = null;
+        			mousedBuilding = new SolarPlant();
+        		}
+        		
+        	}
+        	else if(e.getY() < HEIGHT - 100){
+        		guiCompo = null;
+        	}
+        }*/
+    }
+    public void mouseClicked(MouseEvent e) {
+        if(state == GameState.MENU) {
+        	state = GameState.GAME;
+        }
+    }
+    public void mouseEntered(MouseEvent e) {
+        
+    }
+    public void mouseExited(MouseEvent e) {
+        
+    }
+
+    public static void main(String args[]) {
+        new Main().start();
+    }
+
+	@Override
+	public void mouseDragged(MouseEvent e) {
+		if(state == GameState.GAME) {
+			if(guiCompo instanceof MenuMenu) {
+				if(e.getX() >= WIDTH/2 - 200 && e.getX() <= WIDTH/2 + 200) {
+					if(e.getY() >= HEIGHT/2 - 90 && e.getY() <= HEIGHT/2 - 70) {
+						taxes = (e.getX() - (WIDTH/2 - 200))/4;
+					}
+				}
+			}
+		}
+	}
+
+	@Override
+	public void mouseMoved(MouseEvent e) {
+		if(state == GameState.GAME) {
+			mouseX = e.getX();
+			mouseY = e.getY();
+			if(mousedBuilding != null) {
+				//mousedBuilding.x = mouseX;
+				//mousedBuilding.y = mouseY;
+				mousedBuilding.x = (int) (((mouseX - WIDTH/2) / (16 * HEIGHTSCALE)) - (chunks.get(0).x));
+				if(mousedBuilding.x < 0) {
+					mousedBuilding.x = 0;
+				}
+				if(mousedBuilding instanceof Mine || mousedBuilding instanceof PowerPlant) {
+					if(mousedBuilding.x > 115) {
+						mousedBuilding.x = 115;
+					}
+				}
+				//mousedBuilding.y = (int) (((mouseY - HEIGHT/2) / (16 * HEIGHTSCALE)) - (chunks.get(0).y));
+				mousedBuilding.y = chunks.get(0).dirtLevel - 4;
+			}
+			
+			//STATPANEL TAG
+			if(guiCompo instanceof BuildingMenu) {
+				if(mouseX >= 10 && mouseX <= 90) {
+	        		if(mouseY >= HEIGHT - 90 && mouseY <= HEIGHT - 10) {
+	        			statPanelTag = "+Money -Energies -Foodings *Place over water*";
+	        		}
+				}
+				if(mouseX >= 110 && mouseX <= 190) {
+	        		if(mouseY >= HEIGHT - 90 && mouseY <= HEIGHT - 10) {
+	        			statPanelTag = "+Foodings *Place over water*";
+	        		}
+				}
+				if(mouseX >= 210 && mouseX <= 290) {
+	        		if(mouseY >= HEIGHT - 90 && mouseY <= HEIGHT - 10) {
+	        			statPanelTag = "+Energies +Pollution *Place over fossil fyools*";
+	        		}
+				}
+				if(mouseX >= 310 && mouseX <= 390) {
+	        		if(mouseY >= HEIGHT - 90 && mouseY <= HEIGHT - 10) {
+	        			statPanelTag = "-Money -Energies +Science";
+	        		}
+				}
+				if(mouseX >= 410 && mouseX <= 490) {
+	        		if(mouseY >= HEIGHT - 90 && mouseY <= HEIGHT - 10) {
+	        			statPanelTag = "+Energies +Munnies";
+	        		}
+				}
+				if(mouseX >= 510 && mouseX <= 590) {
+					if(mouseY >= HEIGHT - 90 && mouseY <= HEIGHT - 10) {
+						statPanelTag = "-Energies -Pollution";
+					}
+				}
+			}
+		}
+	}
+}

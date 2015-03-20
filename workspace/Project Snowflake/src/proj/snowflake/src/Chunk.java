@@ -2,13 +2,14 @@ package proj.snowflake.src;
 
 public class Chunk {
 	
-	Block[][] blocks = new Block[300][100];
+	Block[][] blocks = new Block[125][100];
 	
 	public int dirtLevel = 30;
+	public int stoneLevel = dirtLevel + (int) (Math.random() * 10 + 3);
 	public int mountainLoc = (int) (Math.random() * 30) + 20;
 	public int maxMountainHeight = 25;
-	public int aquifersPerChunk = 50;
-	public int coalVeinsPerChunk = 5;
+	public int aquifersPerChunk = 10;
+	public int coalVeinsPerChunk = 13;
 	
 	public AquiferStartingPoint[] aquifers = new AquiferStartingPoint[aquifersPerChunk];
 	public CoalStartingPoint[] coalVeins = new CoalStartingPoint[coalVeinsPerChunk];
@@ -23,21 +24,39 @@ public class Chunk {
 	public Chunk(int x, int y) {
 		this.x = x;
 		this.y = y;
-		for(int i = 0; i < 300; i++){
-			for(int j = 0; j < 100; j++) {
-				if(j > dirtLevel) {
-					if(Math.random() >= 0.5) {
+		for(int i = 0; i < blocks.length; i++) {
+			for(int j = 0; j < blocks[0].length; j++) {
+				if(j > dirtLevel && j <= stoneLevel) {
+					/*if(Math.random() >= 0.5) {
 						blocks[i][j] = new DirtBlock();
 					}
 					else {
 						blocks[i][j] = new LimestoneBlock();
+					}*/
+					if(j == dirtLevel + 1) {
+						blocks[i][j] = new LimestoneBlock();
 					}
+					else if(j == dirtLevel + 2) {
+						if(Math.random() >= .5) {
+							blocks[i][j] = new LimestoneBlock();
+						}
+						else {
+							blocks[i][j] = new DirtBlock();
+						}
+					}
+					else {
+						blocks[i][j] = new DirtBlock();
+					}
+				}
+				else if(j > stoneLevel) {
+					blocks[i][j] = new StoneBlock();
 				}
 				else {
 					blocks[i][j] = null;
 				}
 			}
 		}
+		
 		for(int i = 0; i < aquifersPerChunk; i++) {
 			aquifers[i] = new AquiferStartingPoint(this);
 		}
